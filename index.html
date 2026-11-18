@@ -1,0 +1,2233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Midnight Fridge Glow</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23040812'/%3E%3Crect x='16' y='8' width='32' height='48' rx='7' fill='%2300d4ff' opacity='0.25'/%3E%3Crect x='18' y='10' width='28' height='44' rx='6' fill='%230b1a2e' stroke='%2300e5ff' stroke-width='2.5'/%3E%3Cline x1='18' y1='26' x2='46' y2='26' stroke='%2300e5ff' stroke-width='2'/%3E%3Crect x='40' y='15' width='3' height='8' rx='1.5' fill='%23ffffff'/%3E%3Crect x='40' y='31' width='3' height='12' rx='1.5' fill='%23ffffff'/%3E%3Ccircle cx='30' cy='39' r='4' fill='%237dff9e'/%3E%3Ccircle cx='28.7' cy='38.5' r='1' fill='%23040812'/%3E%3Ccircle cx='31.3' cy='38.5' r='1' fill='%23040812'/%3E%3C/svg%3E" />
+  <style>
+    :root {
+      --bg-dark: #03050a;
+      --neon-cyan: #00e5ff;
+      --neon-blue: #0077ff;
+      --ice-white: #e0f7ff;
+      --goblin-green: #69f0ae;
+      --goblin-dark: #1d4d3a;
+      --fridge-enamel-1: #1b2536;
+      --fridge-enamel-2: #0f1623;
+      --chrome-grad: linear-gradient(135deg, #f5f9ff 0%, #9ab0c9 35%, #ffffff 50%, #5b6d82 85%, #d6e4f2 100%);
+      --door-open: 0;
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: var(--bg-dark);
+      color: #dff4ff;
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    /* Kitchen Backdrop */
+    .kitchen {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background:
+        radial-gradient(circle at 50% 48%, rgba(0, 170, 255, calc(0.06 + var(--door-open) * 0.28)) 0%, rgba(0, 40, 90, calc(0.03 + var(--door-open) * 0.14)) 42%, rgba(2, 4, 9, 0.98) 76%),
+        #020409;
+      transition: background 0.15s ease-out;
+    }
+
+    /* Subtle dark kitchen tiles illuminated only by the fridge glow */
+    .kitchen-tiles {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      opacity: calc(0.04 + var(--door-open) * 0.35);
+      background-image:
+        linear-gradient(to right, rgba(0, 210, 255, 0.14) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(0, 210, 255, 0.14) 1px, transparent 1px);
+      background-size: 54px 54px;
+      mask-image: radial-gradient(circle at 50% 48%, black 15%, transparent 72%);
+      -webkit-mask-image: radial-gradient(circle at 50% 48%, black 15%, transparent 72%);
+    }
+
+    /* Floor reflection */
+    .kitchen-floor {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: 22vh;
+      pointer-events: none;
+      background:
+        linear-gradient(to bottom, rgba(0, 180, 255, calc(0.03 + var(--door-open) * 0.18)), rgba(0, 8, 20, 0.95)),
+        repeating-linear-gradient(90deg, rgba(255,255,255,0.015) 0 80px, rgba(0,0,0,0.08) 80px 160px);
+      border-top: 1px solid rgba(0, 229, 255, calc(0.08 + var(--door-open) * 0.25));
+      transition: border-color 0.2s;
+    }
+
+    /* Atmospheric volumetric canvas layers */
+    #lightCanvas, #dustCanvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+    #lightCanvas { z-index: 2; }
+    #dustCanvas { z-index: 25; }
+
+    /* Top HUD */
+    .hud-top {
+      position: fixed;
+      top: 12px;
+      left: 14px;
+      right: 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 40;
+      pointer-events: none;
+      gap: 8px;
+    }
+
+    .hud-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      pointer-events: auto;
+    }
+
+    .clock-badge {
+      background: rgba(5, 10, 20, 0.88);
+      border: 1px solid rgba(0, 229, 255, 0.28);
+      border-radius: 10px;
+      padding: 6px 12px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      color: #ff4757;
+      text-shadow: 0 0 8px rgba(255, 71, 87, 0.75);
+      cursor: pointer;
+      box-shadow: 0 0 18px rgba(0, 0, 0, 0.8), inset 0 0 12px rgba(255, 71, 87, 0.12);
+      transition: transform 0.12s, border-color 0.2s;
+    }
+    .clock-badge:hover {
+      border-color: rgba(255, 71, 87, 0.7);
+      transform: scale(1.03);
+    }
+    .clock-badge .colon {
+      animation: blinkColon 1s steps(1) infinite;
+    }
+    @keyframes blinkColon {
+      0%, 49% { opacity: 1; }
+      50%, 100% { opacity: 0.2; }
+    }
+
+    .pill-btn {
+      background: rgba(8, 17, 32, 0.85);
+      border: 1px solid rgba(0, 229, 255, 0.35);
+      color: #c9f3ff;
+      border-radius: 999px;
+      padding: 7px 13px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      backdrop-filter: blur(6px);
+      transition: all 0.15s ease;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.55);
+    }
+    .pill-btn:hover {
+      border-color: var(--neon-cyan);
+      box-shadow: 0 0 14px rgba(0, 229, 255, 0.35);
+      transform: translateY(-1px);
+    }
+    .pill-btn:active {
+      transform: translateY(0);
+    }
+    .pill-btn.active-alert {
+      border-color: #ff6b81;
+      color: #ffd5dc;
+      animation: pulseWarn 0.7s infinite alternate;
+    }
+    @keyframes pulseWarn {
+      from { box-shadow: 0 0 6px rgba(255, 71, 87, 0.4); }
+      to { box-shadow: 0 0 18px rgba(255, 71, 87, 0.85); }
+    }
+
+    /* Main Stage */
+    .stage {
+      position: relative;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      height: 100%;
+      padding: 58px 14px 18px;
+      gap: 24px;
+    }
+
+    /* Retro Fridge Container */
+    .fridge-wrap {
+      position: relative;
+      width: min(350px, 84vw);
+      height: min(560px, 76vh);
+      perspective: 1400px;
+      flex-shrink: 0;
+    }
+
+    /* Shadow & Neon Under-glow */
+    .fridge-underglow {
+      position: absolute;
+      left: -18px;
+      right: -18px;
+      bottom: -14px;
+      height: 28px;
+      border-radius: 50%;
+      background: radial-gradient(ellipse at center, rgba(0, 229, 255, calc(0.18 + var(--door-open) * 0.55)) 0%, transparent 72%);
+      filter: blur(8px);
+      pointer-events: none;
+    }
+
+    /* Retro Fridge Body (Interior + Cabinet) */
+    .fridge-cabinet {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      border-radius: 34px 34px 20px 20px;
+      background: linear-gradient(160deg, #1b283d 0%, #0d1522 100%);
+      border: 4px solid #2b3e5a;
+      box-shadow:
+        0 28px 65px rgba(0, 0, 0, 0.95),
+        0 0 calc(20px + var(--door-open) * 65px) rgba(0, 195, 255, calc(0.15 + var(--door-open) * 0.45)),
+        inset 0 0 18px rgba(0, 0, 0, 0.8);
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Chrome feet */
+    .fridge-foot {
+      position: absolute;
+      bottom: -11px;
+      width: 30px;
+      height: 12px;
+      border-radius: 0 0 8px 8px;
+      background: var(--chrome-grad);
+      box-shadow: 0 4px 10px rgba(0,0,0,0.9);
+    }
+    .fridge-foot.left { left: 26px; }
+    .fridge-foot.right { right: 26px; }
+
+    /* Fridge Interior Cavity */
+    .fridge-interior {
+      position: relative;
+      flex: 1;
+      border-radius: 22px 22px 12px 12px;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 50% 18%, rgba(180, 248, 255, 0.95) 0%, rgba(0, 212, 255, 0.72) 26%, rgba(0, 92, 168, 0.85) 68%, rgba(4, 24, 52, 0.98) 100%);
+      box-shadow:
+        inset 0 0 38px rgba(0, 238, 255, 0.8),
+        inset 0 10px 28px rgba(255, 255, 255, 0.45);
+      display: flex;
+      flex-direction: column;
+      padding: 10px 10px 8px;
+      gap: 6px;
+      transition: filter 0.3s;
+    }
+
+    .fridge-interior.blizzard-mode {
+      background:
+        radial-gradient(circle at 50% 15%, #ffffff 0%, #b4e8ff 32%, #4a7dff 75%, #161848 100%);
+      filter: saturate(1.2) brightness(1.08);
+    }
+
+    /* Top LED Light Bar */
+    .led-strip {
+      position: absolute;
+      top: 4px;
+      left: 18%;
+      right: 18%;
+      height: 7px;
+      border-radius: 99px;
+      background: #e6fbff;
+      box-shadow:
+        0 0 12px #ffffff,
+        0 0 28px #00e5ff,
+        0 6px 40px #00a2ff;
+      z-index: 2;
+      pointer-events: none;
+    }
+
+    /* Freezer Compartment */
+    .freezer-box {
+      position: relative;
+      height: 22%;
+      min-height: 82px;
+      border-radius: 14px 14px 6px 6px;
+      background: linear-gradient(180deg, rgba(210, 245, 255, 0.38) 0%, rgba(0, 145, 220, 0.32) 100%);
+      border: 2px solid rgba(200, 248, 255, 0.65);
+      box-shadow: inset 0 0 16px rgba(255, 255, 255, 0.45);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 12px 6px;
+      cursor: pointer;
+      overflow: hidden;
+      transition: transform 0.15s, border-color 0.2s;
+      z-index: 3;
+    }
+    .freezer-box:hover {
+      border-color: #ffffff;
+    }
+    .freezer-door-overlay {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(145deg, rgba(215, 247, 255, 0.86) 0%, rgba(125, 212, 245, 0.68) 65%, rgba(70, 165, 220, 0.78) 100%);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 14px;
+      color: #053554;
+      font-weight: 800;
+      font-size: 12px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.3s;
+      transform-origin: top center;
+      backdrop-filter: blur(2px);
+    }
+    .freezer-box.open .freezer-door-overlay {
+      transform: rotateX(78deg) translateY(-10px);
+      opacity: 0.18;
+      pointer-events: none;
+    }
+    .freezer-contents {
+      display: flex;
+      align-items: center;
+      justify-content: space-around;
+      width: 100%;
+      font-size: 11px;
+      color: #042b47;
+      font-weight: 700;
+    }
+    .ice-tray-btn {
+      background: rgba(255, 255, 255, 0.65);
+      border: 1.5px solid #fff;
+      border-radius: 8px;
+      padding: 4px 8px;
+      font-size: 11px;
+      font-weight: 700;
+      color: #05395e;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      box-shadow: 0 2px 8px rgba(0, 70, 120, 0.25);
+    }
+    .ice-tray-btn:hover {
+      background: #ffffff;
+      transform: scale(1.05);
+    }
+
+    /* Glass Shelves */
+    .shelf {
+      position: relative;
+      flex: 1;
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-around;
+      padding: 4px 6px 8px;
+      border-bottom: 5px solid rgba(190, 245, 255, 0.72);
+      box-shadow: 0 4px 12px rgba(0, 229, 255, 0.28);
+      z-index: 4;
+    }
+    .shelf::after {
+      content: "";
+      position: absolute;
+      left: 2px;
+      right: 2px;
+      bottom: -5px;
+      height: 2px;
+      background: rgba(255, 255, 255, 0.9);
+      border-radius: 2px;
+    }
+
+    /* Crisper Drawer */
+    .crisper {
+      height: 15%;
+      min-height: 54px;
+      border-radius: 6px 6px 12px 12px;
+      background: linear-gradient(180deg, rgba(160, 235, 255, 0.26) 0%, rgba(0, 110, 185, 0.45) 100%);
+      border: 1.5px solid rgba(185, 242, 255, 0.45);
+      display: flex;
+      align-items: center;
+      justify-content: space-around;
+      padding: 4px 8px;
+      position: relative;
+      z-index: 4;
+    }
+    .crisper-label {
+      position: absolute;
+      top: 3px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 9px;
+      letter-spacing: 1.4px;
+      text-transform: uppercase;
+      color: rgba(215, 248, 255, 0.75);
+      pointer-events: none;
+    }
+
+    /* Snack Items */
+    .snack {
+      position: relative;
+      cursor: pointer;
+      transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.18s;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-end;
+      padding: 2px;
+      z-index: 5;
+    }
+    .snack:hover {
+      transform: translateY(-4px) scale(1.09);
+      filter: drop-shadow(0 0 10px rgba(180, 250, 255, 0.95));
+      z-index: 12;
+    }
+    .snack.selected {
+      transform: translateY(-5px) scale(1.12);
+      filter: drop-shadow(0 0 12px #00ffff);
+      z-index: 14;
+    }
+    .snack.consumed {
+      opacity: 0.42;
+      filter: grayscale(0.5);
+    }
+    .snack-tag {
+      font-size: 9px;
+      font-weight: 700;
+      color: #dff8ff;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.9);
+      margin-top: 1px;
+      white-space: nowrap;
+      pointer-events: none;
+    }
+
+    /* Gelatin wobble animation */
+    @keyframes jiggle {
+      0%, 100% { transform: scale(1, 1) skewX(0deg); }
+      20% { transform: scale(1.12, 0.88) skewX(6deg); }
+      40% { transform: scale(0.9, 1.1) skewX(-5deg); }
+      60% { transform: scale(1.06, 0.94) skewX(3deg); }
+      80% { transform: scale(0.97, 1.03) skewX(-2deg); }
+    }
+    .wobble-active {
+      animation: jiggle 0.55s ease-out;
+    }
+    @keyframes subtleBuzz {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-0.8px) rotate(-0.6deg); }
+      75% { transform: translateX(0.8px) rotate(0.6deg); }
+    }
+    .snack-gelatin svg {
+      animation: subtleBuzz 0.35s infinite;
+    }
+
+    /* Fridge Goblin! */
+    .goblin-spot {
+      position: relative;
+      width: 78px;
+      height: 82px;
+      cursor: pointer;
+      z-index: 9;
+      transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+      transform-origin: bottom center;
+      flex-shrink: 0;
+    }
+    .goblin-spot:hover {
+      transform: scale(1.08) translateY(-2px);
+    }
+    .goblin-spot.playing {
+      animation: goblinBob 0.34s infinite alternate ease-in-out;
+    }
+    .goblin-spot.shivering {
+      animation: goblinShiver 0.08s infinite;
+    }
+    @keyframes goblinBob {
+      from { transform: translateY(0) rotate(-3deg); }
+      to { transform: translateY(-4px) rotate(3deg); }
+    }
+    @keyframes goblinShiver {
+      0% { transform: translateX(-2px); }
+      50% { transform: translateX(2px); }
+      100% { transform: translateX(-2px); }
+    }
+
+    /* Retro Swing Door */
+    .fridge-door {
+      position: absolute;
+      inset: 0;
+      border-radius: 34px 34px 20px 20px;
+      transform-origin: left center;
+      transform-style: preserve-3d;
+      transform: rotateY(0deg);
+      z-index: 20;
+      cursor: grab;
+      will-change: transform;
+    }
+    .fridge-door:active {
+      cursor: grabbing;
+    }
+
+    .door-front {
+      position: absolute;
+      inset: 0;
+      border-radius: 34px 34px 20px 20px;
+      backface-visibility: hidden;
+      background:
+        radial-gradient(circle at 26% 24%, rgba(255, 255, 255, 0.08) 0%, transparent 45%),
+        linear-gradient(135deg, #1b2a42 0%, #10192b 52%, #09101c 100%);
+      border: 3px solid #2e4363;
+      box-shadow:
+        inset 3px 3px 10px rgba(255, 255, 255, 0.08),
+        inset -6px -6px 18px rgba(0, 0, 0, 0.75),
+        0 0 24px rgba(0, 210, 255, calc(0.12 + (1 - var(--door-open)) * 0.12));
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px 20px;
+    }
+
+    /* Subtle glowing gasket leak around closed door */
+    .door-front::before {
+      content: "";
+      position: absolute;
+      inset: -4px;
+      border-radius: 36px 36px 22px 22px;
+      border: 2px solid rgba(0, 229, 255, 0.42);
+      filter: blur(3px);
+      opacity: calc(1 - var(--door-open));
+      animation: gasketPulse 3s ease-in-out infinite;
+      pointer-events: none;
+    }
+    @keyframes gasketPulse {
+      0%, 100% { opacity: 0.35; }
+      50% { opacity: 0.8; }
+    }
+
+    /* Retro Door Seam */
+    .door-seam {
+      position: absolute;
+      top: 30%;
+      left: 14px;
+      right: 14px;
+      height: 3px;
+      background: linear-gradient(90deg, transparent, rgba(160, 210, 255, 0.35), transparent);
+      border-radius: 4px;
+    }
+
+    /* Vintage Chrome Badge */
+    .retro-badge {
+      margin-top: 22px;
+      padding: 5px 14px;
+      border-radius: 999px;
+      background: var(--chrome-grad);
+      color: #0b1829;
+      font-size: 11px;
+      font-weight: 900;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      box-shadow: 0 3px 8px rgba(0,0,0,0.7), inset 0 1px 1px #fff;
+    }
+
+    /* Fridge Magnets */
+    .magnet-note {
+      position: absolute;
+      top: 39%;
+      left: 22%;
+      width: 96px;
+      padding: 8px 8px 10px;
+      background: #e9d97c;
+      color: #241b08;
+      font-family: "Comic Sans MS", "Chalkboard SE", cursive, sans-serif;
+      font-size: 11px;
+      line-height: 1.25;
+      font-weight: 700;
+      transform: rotate(-5deg);
+      box-shadow: 2px 6px 12px rgba(0,0,0,0.65);
+      border-radius: 2px;
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+    .magnet-note:hover {
+      transform: rotate(-1deg) scale(1.05);
+    }
+    .magnet-pin {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 35%, #ff8598, #c01532);
+      margin: 0 auto 4px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+    }
+    .magnet-emoji {
+      position: absolute;
+      top: 57%;
+      left: 48%;
+      font-size: 24px;
+      filter: drop-shadow(0 4px 5px rgba(0,0,0,0.8));
+      transform: rotate(10deg);
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+    .magnet-emoji:hover {
+      transform: rotate(-8deg) scale(1.2);
+    }
+
+    /* Heavy Chrome Pull Handle */
+    .chrome-handle {
+      position: absolute;
+      right: 18px;
+      top: 38%;
+      width: 22px;
+      height: 122px;
+      border-radius: 12px;
+      background: var(--chrome-grad);
+      box-shadow:
+        -4px 6px 14px rgba(0, 0, 0, 0.85),
+        0 0 16px rgba(0, 229, 255, 0.32),
+        inset 1px 1px 3px #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: grab;
+    }
+    .chrome-handle::after {
+      content: "";
+      width: 5px;
+      height: 76px;
+      border-radius: 4px;
+      background: linear-gradient(180deg, rgba(0, 229, 255, 0.55), rgba(0, 60, 120, 0.4));
+    }
+    .handle-hint {
+      position: absolute;
+      right: 50px;
+      top: 45%;
+      background: rgba(0, 229, 255, 0.14);
+      border: 1px solid rgba(0, 229, 255, 0.55);
+      color: #a6f4ff;
+      padding: 5px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+      white-space: nowrap;
+      pointer-events: none;
+      animation: floatHint 1.8s ease-in-out infinite;
+      opacity: calc(1 - var(--door-open) * 3);
+      transition: opacity 0.2s;
+    }
+    @keyframes floatHint {
+      0%, 100% { transform: translateX(0); }
+      50% { transform: translateX(-6px); }
+    }
+
+    /* Back of the Swung Door (Door Shelves!) */
+    .door-back {
+      position: absolute;
+      inset: 0;
+      border-radius: 34px 34px 20px 20px;
+      backface-visibility: hidden;
+      transform: rotateY(180deg);
+      background: linear-gradient(135deg, #0b2442 0%, #071429 100%);
+      border: 4px solid #3c638e;
+      box-shadow: inset 0 0 28px rgba(0, 229, 255, 0.45);
+      padding: 20px 14px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .door-rack {
+      border: 2px solid rgba(190, 245, 255, 0.5);
+      border-top: none;
+      border-radius: 0 0 12px 12px;
+      height: 74px;
+      background: rgba(0, 200, 255, 0.1);
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-around;
+      padding: 4px 8px;
+    }
+
+    /* Goblin Inspector & Commentary Panel */
+    .goblin-panel {
+      width: min(340px, 92vw);
+      background: rgba(6, 14, 28, 0.86);
+      border: 1px solid rgba(0, 229, 255, 0.34);
+      border-radius: 20px;
+      padding: 16px 18px;
+      backdrop-filter: blur(12px);
+      box-shadow:
+        0 20px 50px rgba(0, 0, 0, 0.85),
+        0 0 30px rgba(0, 175, 255, 0.14);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      transition: opacity 0.35s ease, transform 0.35s ease;
+    }
+    .goblin-panel.door-closed-dim {
+      opacity: 0.72;
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      border-bottom: 1px solid rgba(0, 229, 255, 0.16);
+      padding-bottom: 10px;
+    }
+    .goblin-title {
+      display: flex;
+      flex-direction: column;
+    }
+    .goblin-name {
+      font-size: 14px;
+      font-weight: 800;
+      color: var(--goblin-green);
+      letter-spacing: 0.4px;
+    }
+    .goblin-role {
+      font-size: 11px;
+      color: #82b7d9;
+    }
+    .rating-chip {
+      background: rgba(0, 229, 255, 0.14);
+      border: 1px solid rgba(0, 229, 255, 0.45);
+      color: #9ff5ff;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    .speech-bubble {
+      position: relative;
+      background: rgba(11, 27, 50, 0.82);
+      border: 1px solid rgba(105, 240, 174, 0.32);
+      border-radius: 14px;
+      padding: 12px 14px;
+      font-size: 14px;
+      line-height: 1.45;
+      color: #e9fbff;
+      min-height: 76px;
+    }
+    .speech-verdict {
+      display: block;
+      margin-top: 6px;
+      font-size: 12px;
+      font-weight: 700;
+      color: #ffd166;
+    }
+
+    .snack-inspector {
+      background: rgba(3, 10, 22, 0.75);
+      border: 1px solid rgba(0, 229, 255, 0.18);
+      border-radius: 14px;
+      padding: 11px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 9px;
+    }
+    .inspector-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .inspector-name {
+      font-size: 14px;
+      font-weight: 700;
+      color: #ffffff;
+    }
+    .inspector-meta {
+      font-size: 11px;
+      color: #7eb6d9;
+    }
+    .action-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+    }
+    .act-btn {
+      flex: 1;
+      min-width: 82px;
+      background: linear-gradient(180deg, rgba(0, 165, 255, 0.25), rgba(0, 90, 180, 0.3));
+      border: 1px solid rgba(0, 229, 255, 0.42);
+      color: #e1f8ff;
+      border-radius: 10px;
+      padding: 7px 9px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.14s;
+    }
+    .act-btn:hover:not(:disabled) {
+      background: linear-gradient(180deg, rgba(0, 210, 255, 0.42), rgba(0, 120, 220, 0.45));
+      transform: translateY(-1px);
+    }
+    .act-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+    .act-btn.serenade {
+      background: linear-gradient(180deg, rgba(105, 240, 174, 0.22), rgba(25, 130, 90, 0.28));
+      border-color: rgba(105, 240, 174, 0.45);
+      color: #d6ffea;
+    }
+
+    .footer-stats {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      color: #7aa8c7;
+      padding-top: 2px;
+    }
+
+    /* Mobile Responsive Layout */
+    @media (max-width: 780px) {
+      .stage {
+        flex-direction: column;
+        justify-content: flex-start;
+        padding-top: 52px;
+        gap: 10px;
+        overflow-y: auto;
+      }
+      .fridge-wrap {
+        width: min(300px, 84vw);
+        height: min(410px, 53vh);
+      }
+      .goblin-panel {
+        width: min(350px, 94vw);
+        padding: 11px 13px;
+        gap: 8px;
+      }
+      .speech-bubble {
+        min-height: 54px;
+        padding: 9px 11px;
+        font-size: 13px;
+      }
+      .chrome-handle {
+        height: 92px;
+        width: 19px;
+      }
+      .goblin-spot {
+        width: 64px;
+        height: 68px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="kitchen" id="kitchen">
+    <div class="kitchen-tiles"></div>
+    <div class="kitchen-floor"></div>
+
+    <canvas id="lightCanvas"></canvas>
+    <canvas id="dustCanvas"></canvas>
+
+    <!-- Top HUD -->
+    <header class="hud-top">
+      <div class="hud-group">
+        <button class="clock-badge" id="clockBtn" title="Kitchen microwave clock (click me)">
+          <span id="clockHours">03</span><span class="colon">:</span><span id="clockMins">00</span> <span id="clockAmPm">AM</span>
+        </button>
+      </div>
+      <div class="hud-group">
+        <button class="pill-btn" id="doorToggleBtn">🚪 Open Fridge</button>
+        <button class="pill-btn" id="muteBtn" aria-label="Toggle Sound">🔊 Sound On</button>
+      </div>
+    </header>
+
+    <!-- Main Interactive Stage -->
+    <main class="stage">
+      <div class="fridge-wrap" id="fridgeWrap">
+        <div class="fridge-underglow"></div>
+
+        <div class="fridge-cabinet">
+          <div class="fridge-foot left"></div>
+          <div class="fridge-foot right"></div>
+
+          <!-- Illuminated Fridge Interior -->
+          <div class="fridge-interior" id="fridgeInterior">
+            <div class="led-strip"></div>
+
+            <!-- Freezer Compartment (Easter Egg!) -->
+            <div class="freezer-box" id="freezerBox" title="Tap to inspect freezer">
+              <div class="freezer-contents">
+                <span>🧊 Mystery Frost</span>
+                <button class="ice-tray-btn" id="iceMakerBtn" type="button">❄️ Ice Tray</button>
+              </div>
+              <div class="freezer-door-overlay">
+                <span>❄️ FREEZER</span>
+                <span>TAP TO PEEK</span>
+              </div>
+            </div>
+
+            <!-- Top Shelf + Tiny Fridge Goblin -->
+            <div class="shelf" id="shelf1">
+              <!-- Cold Pizza -->
+              <div class="snack" data-id="pizza" title="Cold Pizza Slice">
+                <svg width="52" height="46" viewBox="0 0 60 52">
+                  <polygon points="8,44 54,36 28,8" fill="#d9a14a" stroke="#f5cb78" stroke-width="2"/>
+                  <path d="M12,42 Q30,36 50,35" stroke="#b37126" stroke-width="6" fill="none" stroke-linecap="round"/>
+                  <polygon points="15,38 46,33 28,13" fill="#ffd970"/>
+                  <circle cx="28" cy="24" r="4" fill="#c9362b"/>
+                  <circle cx="34" cy="31" r="3.5" fill="#c9362b"/>
+                  <circle cx="23" cy="32" r="3" fill="#c9362b"/>
+                </svg>
+                <span class="snack-tag">Cold Pizza</span>
+              </div>
+
+              <!-- 2024 Tupperware -->
+              <div class="snack" data-id="tupperware" title="Unlabeled Tupperware (2024)">
+                <svg width="54" height="42" viewBox="0 0 64 48">
+                  <rect x="10" y="14" width="44" height="28" rx="6" fill="rgba(165, 255, 215, 0.38)" stroke="#9fffe0" stroke-width="2"/>
+                  <ellipse cx="32" cy="28" rx="15" ry="9" fill="#46e39d" opacity="0.72"/>
+                  <circle cx="26" cy="26" r="3" fill="#b7ffdb" opacity="0.8"/>
+                  <circle cx="37" cy="29" r="4" fill="#209c69" opacity="0.7"/>
+                  <rect x="7" y="9" width="50" height="7" rx="3" fill="#2bc491" stroke="#a6ffe6" stroke-width="1.5"/>
+                </svg>
+                <span class="snack-tag">2024 Mystery</span>
+              </div>
+
+              <!-- Tiny Fridge Goblin -->
+              <div class="goblin-spot" id="goblinSprite" title="Click Balthazar the Fridge Goblin!">
+                <svg id="goblinSvg" viewBox="0 0 110 116" width="100%" height="100%">
+                  <!-- Pointy Ears -->
+                  <path d="M24,38 L6,26 L20,48 Z" fill="#52c98d" stroke="#184b36" stroke-width="2"/>
+                  <path d="M86,38 L104,26 L90,48 Z" fill="#52c98d" stroke="#184b36" stroke-width="2"/>
+                  <!-- Body / Knit Scarf -->
+                  <ellipse cx="55" cy="86" rx="28" ry="24" fill="#2f855a" stroke="#143b2a" stroke-width="2"/>
+                  <path d="M32,67 Q55,75 78,67 L81,76 Q55,83 29,76 Z" fill="#ff5978" stroke="#7d1730" stroke-width="1.8"/>
+                  <!-- Head -->
+                  <ellipse cx="55" cy="42" rx="26" ry="22" fill="#69f0ae" stroke="#184b36" stroke-width="2.2"/>
+                  <!-- Tiny Blue Beanie -->
+                  <path d="M31,32 Q55,6 79,32 Z" fill="#1e88e5" stroke="#0d47a1" stroke-width="2"/>
+                  <circle cx="55" cy="14" r="5" fill="#e1f5fe"/>
+                  <!-- Eyes -->
+                  <circle cx="43" cy="41" r="7" fill="#fffde7" stroke="#184b36" stroke-width="1.8"/>
+                  <circle cx="67" cy="41" r="7" fill="#fffde7" stroke="#184b36" stroke-width="1.8"/>
+                  <circle id="pupilL" cx="44" cy="41" r="3.2" fill="#0d1b2a"/>
+                  <circle id="pupilR" cx="68" cy="41" r="3.2" fill="#0d1b2a"/>
+                  <circle cx="45" cy="39.5" r="1.1" fill="#ffffff"/>
+                  <circle cx="69" cy="39.5" r="1.1" fill="#ffffff"/>
+                  <!-- Snout / Mouth -->
+                  <ellipse cx="55" cy="49" rx="5.5" ry="3.5" fill="#38b87c"/>
+                  <path id="goblinMouth" d="M46,56 Q55,62 64,56" fill="none" stroke="#143b2a" stroke-width="2.3" stroke-linecap="round"/>
+                  <!-- Tiny Squeezebox Accordion! -->
+                  <g id="goblinAccordion" transform="translate(26, 74)">
+                    <rect x="0" y="2" width="11" height="28" rx="3" fill="#c62828" stroke="#5d0e0e" stroke-width="1.5"/>
+                    <g id="bellows">
+                      <polygon points="11,4 18,2 18,30 11,28" fill="#ffe082" stroke="#5d4037" stroke-width="1"/>
+                      <polygon points="18,2 25,4 25,28 18,30" fill="#fff8e1" stroke="#5d4037" stroke-width="1"/>
+                      <polygon points="25,4 32,2 32,30 25,28" fill="#ffe082" stroke="#5d4037" stroke-width="1"/>
+                      <polygon points="32,2 39,4 39,28 32,30" fill="#fff8e1" stroke="#5d4037" stroke-width="1"/>
+                      <polygon points="39,4 46,2 46,30 39,28" fill="#ffe082" stroke="#5d4037" stroke-width="1"/>
+                    </g>
+                    <rect x="46" y="2" width="12" height="28" rx="3" fill="#c62828" stroke="#5d0e0e" stroke-width="1.5"/>
+                    <circle cx="52" cy="9" r="1.8" fill="#fff"/>
+                    <circle cx="52" cy="15" r="1.8" fill="#fff"/>
+                    <circle cx="52" cy="21" r="1.8" fill="#fff"/>
+                  </g>
+                </svg>
+              </div>
+            </div>
+
+            <!-- Middle Shelf -->
+            <div class="shelf" id="shelf2">
+              <!-- Glowing Pickle Jar -->
+              <div class="snack" data-id="pickles" title="Radioactive Pickle Jar">
+                <svg width="46" height="54" viewBox="0 0 50 60">
+                  <rect x="13" y="4" width="24" height="8" rx="2" fill="#ffd54f" stroke="#a67c00" stroke-width="1.5"/>
+                  <rect x="10" y="12" width="30" height="44" rx="7" fill="rgba(180, 255, 90, 0.45)" stroke="#d4ff8a" stroke-width="2"/>
+                  <ellipse cx="20" cy="30" rx="5" ry="12" fill="#52b73b" transform="rotate(-12 20 30)"/>
+                  <ellipse cx="30" cy="36" rx="5" ry="11" fill="#3f992b" transform="rotate(14 30 36)"/>
+                  <circle cx="24" cy="20" r="2.2" fill="#e9ff99"/>
+                  <circle cx="29" cy="46" r="1.8" fill="#e9ff99"/>
+                </svg>
+                <span class="snack-tag">Glow Pickles</span>
+              </div>
+
+              <!-- Vibrating Lime Gelatin -->
+              <div class="snack snack-gelatin" data-id="gelatin" title="Suspiciously Vibrating Gelatin">
+                <svg width="50" height="42" viewBox="0 0 56 46">
+                  <ellipse cx="28" cy="38" rx="22" ry="6" fill="#e0f7fa" stroke="#80deea" stroke-width="1.5"/>
+                  <path d="M11,36 Q13,12 28,12 Q43,12 45,36 Z" fill="#76ff03" opacity="0.82" stroke="#ccff90" stroke-width="1.5"/>
+                  <ellipse cx="23" cy="21" rx="5" ry="2.5" fill="#ffffff" opacity="0.55" transform="rotate(-20 23 21)"/>
+                </svg>
+                <span class="snack-tag">Vibing Jello</span>
+              </div>
+
+              <!-- Half-Eaten Ice Cream Pint -->
+              <div class="snack" data-id="icecream" title="Half-Eaten Ice Cream Pint">
+                <svg width="48" height="48" viewBox="0 0 54 54">
+                  <polygon points="12,18 42,18 37,48 17,48" fill="#5c3a21" stroke="#ffd8b0" stroke-width="2"/>
+                  <rect x="10" y="14" width="34" height="6" rx="2" fill="#ff7096" stroke="#fff" stroke-width="1"/>
+                  <!-- Spoon sticking out -->
+                  <line x1="31" y1="15" x2="40" y2="2" stroke="#dce8f5" stroke-width="3.5" stroke-linecap="round"/>
+                  <text x="27" y="36" text-anchor="middle" fill="#ffe8cc" font-size="8" font-weight="bold">CRISIS</text>
+                </svg>
+                <span class="snack-tag">Ice Cream</span>
+              </div>
+            </div>
+
+            <!-- Bottom Shelf -->
+            <div class="shelf" id="shelf3">
+              <!-- Leftover Thai Takeout -->
+              <div class="snack" data-id="takeout" title="Leftover Thai Takeout">
+                <svg width="46" height="48" viewBox="0 0 52 54">
+                  <polygon points="10,18 42,18 38,48 14,48" fill="#fff7eb" stroke="#ff6b6b" stroke-width="2"/>
+                  <polygon points="10,18 18,10 34,10 42,18" fill="#ffe8cc" stroke="#ff6b6b" stroke-width="1.5"/>
+                  <path d="M18,12 C18,3 34,3 34,12" fill="none" stroke="#b0bec5" stroke-width="2"/>
+                  <circle cx="26" cy="33" r="6" fill="#ff6b6b" opacity="0.8"/>
+                </svg>
+                <span class="snack-tag">3AM Noodles</span>
+              </div>
+
+              <!-- Mystery Cheese Cube -->
+              <div class="snack" data-id="cheese" title="Sweating Mystery Cheese">
+                <svg width="44" height="40" viewBox="0 0 50 44">
+                  <polygon points="8,34 42,34 38,16 14,12" fill="#ffd54f" stroke="#ffe57f" stroke-width="2"/>
+                  <circle cx="22" cy="24" r="3" fill="#e6a700"/>
+                  <circle cx="32" cy="28" r="2.2" fill="#e6a700"/>
+                  <circle cx="27" cy="18" r="1.8" fill="#e6a700"/>
+                </svg>
+                <span class="snack-tag">Sweaty Cheese</span>
+              </div>
+
+              <!-- Fizzing Midnight Energy Can -->
+              <div class="snack" data-id="soda" title="Flat Midnight Fizz Can">
+                <svg width="36" height="48" viewBox="0 0 40 54">
+                  <rect x="9" y="8" width="22" height="40" rx="5" fill="#00b0ff" stroke="#b3e5fc" stroke-width="2"/>
+                  <polygon points="22,15 15,28 21,28 18,40 26,25 20,25" fill="#ffee58"/>
+                  <ellipse cx="20" cy="8" rx="9" ry="2.5" fill="#cfd8dc"/>
+                </svg>
+                <span class="snack-tag">Zap Fizz</span>
+              </div>
+            </div>
+
+            <!-- Crisper Drawer -->
+            <div class="crisper">
+              <span class="crisper-label">VEGETABLE GRAVEYARD</span>
+              <div class="snack" data-id="bakingsoda" title="2019 Baking Soda Box">
+                <svg width="40" height="34" viewBox="0 0 46 38">
+                  <rect x="6" y="4" width="34" height="30" rx="3" fill="#ff8a65" stroke="#ffe0b2" stroke-width="1.5"/>
+                  <text x="23" y="22" text-anchor="middle" fill="#fff" font-size="8" font-weight="bold">2019</text>
+                </svg>
+              </div>
+              <div class="snack" data-id="celery" title="Limp Forgotten Celery">
+                <svg width="56" height="32" viewBox="0 0 64 34">
+                  <path d="M8,22 Q32,12 56,20" stroke="#7cb342" stroke-width="6" fill="none" stroke-linecap="round"/>
+                  <path d="M12,26 Q34,18 54,25" stroke="#9ccc65" stroke-width="4" fill="none" stroke-linecap="round"/>
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          <!-- Swinging Heavy Retro Door -->
+          <div class="fridge-door" id="fridgeDoor">
+            <div class="door-front">
+              <div class="retro-badge">FRIGID-O-MATIC '58</div>
+              <div class="door-seam"></div>
+
+              <div class="magnet-note" id="magnetNote">
+                <div class="magnet-pin"></div>
+                DO NOT EAT MY PIZZA.<br/>— DAVE
+              </div>
+
+              <div class="magnet-emoji" id="magnetEmoji" title="Lucky Pizza Magnet">🍕</div>
+
+              <div class="chrome-handle" id="fridgeHandle" title="Pull or click to open"></div>
+              <div class="handle-hint">← Pull / Tap</div>
+            </div>
+
+            <!-- Interior Side of Door -->
+            <div class="door-back">
+              <div class="door-rack">
+                <span style="font-size:20px" title="Expired Mustard">🟡</span>
+                <span style="font-size:20px" title="Hot Sauce">🌶️</span>
+                <span style="font-size:18px" title="Soy Sauce Packets">🥡</span>
+              </div>
+              <div class="door-rack">
+                <span style="font-size:21px" title="Questionable Milk">🥛</span>
+                <span style="font-size:20px" title="Butter Stick">🧈</span>
+              </div>
+              <div class="door-rack">
+                <span style="font-size:18px" title="6-Month Lemon">🍋</span>
+                <span style="font-size:19px" title="Ranch Dressing">🧴</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Goblin Commentary & Snack Inspector -->
+      <aside class="goblin-panel door-closed-dim" id="goblinPanel">
+        <div class="panel-header">
+          <div class="goblin-title">
+            <span class="goblin-name">Balthazar • Fridge Goblin</span>
+            <span class="goblin-role">3 AM Cold-Cut Sommelier</span>
+          </div>
+          <div class="rating-chip" id="ratingChip">3 AM Rating: --/10</div>
+        </div>
+
+        <div class="speech-bubble" id="goblinSpeech">
+          <em>*muffled accordion wheeze from behind the gasket*</em><br/>
+          Pull the chrome handle, human. Let us gaze upon your questionable life choices in 40°F neon light.
+          <span class="speech-verdict" id="speechVerdict">Status: Waiting at the threshold</span>
+        </div>
+
+        <div class="snack-inspector" id="snackInspector">
+          <div class="inspector-top">
+            <div>
+              <div class="inspector-name" id="inspName">No snack selected</div>
+              <div class="inspector-meta" id="inspMeta">Open the door and tap any glowing food item</div>
+            </div>
+          </div>
+          <div class="action-row">
+            <button class="act-btn" id="btnSniff" disabled>👃 Sniff</button>
+            <button class="act-btn" id="btnNibble" disabled>😋 Nibble</button>
+            <button class="act-btn serenade" id="btnSerenade">🪗 Riff</button>
+          </div>
+        </div>
+
+        <div class="footer-stats">
+          <span id="statNibbles">Midnight Nibbles: 0</span>
+          <span id="statDoorTimer">Door Open: 0s</span>
+        </div>
+      </aside>
+    </main>
+  </div>
+
+  <script>
+    (() => {
+      'use strict';
+
+      // =========================================================
+      // 1. PROCEDURAL WEB AUDIO ENGINE (Zero External Assets)
+      // =========================================================
+      class MidnightAudio {
+        constructor() {
+          this.ctx = null;
+          this.master = null;
+          this.humGain = null;
+          this.humFilter = null;
+          this.muted = false;
+          this.initialized = false;
+        }
+
+        init() {
+          if (this.initialized) {
+            if (this.ctx && this.ctx.state === 'suspended') {
+              this.ctx.resume().catch(() => {});
+            }
+            return;
+          }
+          const AudioCtx = window.AudioContext || window.webkitAudioContext;
+          if (!AudioCtx) return;
+
+          this.ctx = new AudioCtx();
+          this.master = this.ctx.createGain();
+          this.master.gain.value = this.muted ? 0 : 0.72;
+          this.master.connect(this.ctx.destination);
+
+          // 60Hz Fridge Compressor Hum + 120Hz harmonic
+          this.humFilter = this.ctx.createBiquadFilter();
+          this.humFilter.type = 'lowpass';
+          this.humFilter.frequency.value = 170;
+
+          this.humGain = this.ctx.createGain();
+          this.humGain.gain.value = 0.045;
+
+          const osc60 = this.ctx.createOscillator();
+          osc60.type = 'triangle';
+          osc60.frequency.value = 60;
+
+          const osc120 = this.ctx.createOscillator();
+          osc120.type = 'sine';
+          osc120.frequency.value = 120;
+          const g120 = this.ctx.createGain();
+          g120.gain.value = 0.35;
+
+          osc60.connect(this.humFilter);
+          osc120.connect(g120);
+          g120.connect(this.humFilter);
+          this.humFilter.connect(this.humGain);
+          this.humGain.connect(this.master);
+
+          osc60.start();
+          osc120.start();
+
+          this.initialized = true;
+        }
+
+        setMuted(mute) {
+          this.muted = mute;
+          if (this.master && this.ctx) {
+            this.master.gain.setTargetAtTime(mute ? 0 : 0.72, this.ctx.currentTime, 0.04);
+          }
+        }
+
+        setDoorOpenLevel(openNorm) {
+          if (!this.initialized || !this.ctx) return;
+          const t = this.ctx.currentTime;
+          // Compressor sounds clearer and slightly louder when door opens
+          this.humGain.gain.setTargetAtTime(0.04 + openNorm * 0.045, t, 0.08);
+          this.humFilter.frequency.setTargetAtTime(160 + openNorm * 190, t, 0.08);
+        }
+
+        playNoiseBurst(duration, filterFreq, q, gainVal, type = 'bandpass', freqEnd = null) {
+          if (!this.initialized || this.muted || !this.ctx) return;
+          const t = this.ctx.currentTime;
+          const bufferSize = Math.floor(this.ctx.sampleRate * duration);
+          const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+          const data = buffer.getChannelData(0);
+          for (let i = 0; i < bufferSize; i++) {
+            data[i] = Math.random() * 2 - 1;
+          }
+
+          const src = this.ctx.createBufferSource();
+          src.buffer = buffer;
+
+          const filter = this.ctx.createBiquadFilter();
+          filter.type = type;
+          filter.frequency.setValueAtTime(filterFreq, t);
+          if (freqEnd) {
+            filter.frequency.exponentialRampToValueAtTime(freqEnd, t + duration);
+          }
+          filter.Q.value = q;
+
+          const g = this.ctx.createGain();
+          g.gain.setValueAtTime(0.001, t);
+          g.gain.linearRampToValueAtTime(gainVal, t + 0.015);
+          g.gain.exponentialRampToValueAtTime(0.0001, t + duration);
+
+          src.connect(filter);
+          filter.connect(g);
+          g.connect(this.master);
+          src.start(t);
+          src.stop(t + duration + 0.02);
+        }
+
+        playDoorOpen() {
+          this.init();
+          if (this.muted || !this.ctx) return;
+          const t = this.ctx.currentTime;
+          // Magnetic gasket suction peel
+          const osc = this.ctx.createOscillator();
+          const g = this.ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(110, t);
+          osc.frequency.exponentialRampToValueAtTime(240, t + 0.09);
+          g.gain.setValueAtTime(0.12, t);
+          g.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
+          osc.connect(g);
+          g.connect(this.master);
+          osc.start(t);
+          osc.stop(t + 0.11);
+
+          // Cold air whoosh
+          this.playNoiseBurst(0.45, 750, 1.4, 0.13, 'bandpass', 280);
+        }
+
+        playDoorClose() {
+          this.init();
+          if (this.muted || !this.ctx) return;
+          const t = this.ctx.currentTime;
+          // Heavy magnetic seal thump
+          const osc = this.ctx.createOscillator();
+          const g = this.ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(150, t);
+          osc.frequency.exponentialRampToValueAtTime(42, t + 0.16);
+          g.gain.setValueAtTime(0.32, t);
+          g.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+          osc.connect(g);
+          g.connect(this.master);
+          osc.start(t);
+          osc.stop(t + 0.2);
+
+          this.playNoiseBurst(0.11, 320, 1.0, 0.18, 'lowpass', 90);
+        }
+
+        playSnackFoley(kind) {
+          this.init();
+          if (this.muted || !this.ctx) return;
+          const t = this.ctx.currentTime;
+
+          if (kind === 'glass') {
+            [1840, 2970].forEach((freq, idx) => {
+              const osc = this.ctx.createOscillator();
+              const g = this.ctx.createGain();
+              osc.type = 'sine';
+              osc.frequency.setValueAtTime(freq, t);
+              g.gain.setValueAtTime(idx === 0 ? 0.14 : 0.07, t);
+              g.gain.exponentialRampToValueAtTime(0.0001, t + 0.24);
+              osc.connect(g);
+              g.connect(this.master);
+              osc.start(t);
+              osc.stop(t + 0.25);
+            });
+          } else if (kind === 'wobble') {
+            const osc = this.ctx.createOscillator();
+            const lfo = this.ctx.createOscillator();
+            const lfoG = this.ctx.createGain();
+            const g = this.ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(190, t);
+            osc.frequency.exponentialRampToValueAtTime(260, t + 0.35);
+            lfo.frequency.value = 18;
+            lfoG.gain.value = 32;
+            lfo.connect(lfoG);
+            lfoG.connect(osc.frequency);
+            g.gain.setValueAtTime(0.18, t);
+            g.gain.exponentialRampToValueAtTime(0.001, t + 0.42);
+            osc.connect(g);
+            g.connect(this.master);
+            lfo.start(t);
+            osc.start(t);
+            lfo.stop(t + 0.43);
+            osc.stop(t + 0.43);
+          } else if (kind === 'pop') {
+            const osc = this.ctx.createOscillator();
+            const g = this.ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(220, t);
+            osc.frequency.exponentialRampToValueAtTime(580, t + 0.06);
+            g.gain.setValueAtTime(0.2, t);
+            g.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
+            osc.connect(g);
+            g.connect(this.master);
+            osc.start(t);
+            osc.stop(t + 0.09);
+          } else if (kind === 'fizz') {
+            this.playNoiseBurst(0.45, 4200, 0.9, 0.15, 'highpass', 6500);
+          } else if (kind === 'crunch') {
+            this.playNoiseBurst(0.08, 1600, 1.5, 0.2, 'bandpass', 900);
+            setTimeout(() => this.playNoiseBurst(0.07, 1900, 1.8, 0.16, 'bandpass', 1100), 85);
+          } else if (kind === 'blizzard') {
+            this.playNoiseBurst(1.1, 1400, 0.8, 0.22, 'bandpass', 320);
+          } else if (kind === 'alarm') {
+            const osc = this.ctx.createOscillator();
+            const g = this.ctx.createGain();
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(980, t);
+            g.gain.setValueAtTime(0.08, t);
+            g.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+            osc.connect(g);
+            g.connect(this.master);
+            osc.start(t);
+            osc.stop(t + 0.13);
+          } else {
+            // Soft wrapper rustle
+            this.playNoiseBurst(0.16, 2400, 1.2, 0.1, 'bandpass', 1400);
+          }
+        }
+
+        // Dramatic Procedural Accordion Synthesizer!
+        playAccordionNote(midiNote, startTime, duration, volume = 0.13, isBass = false) {
+          if (!this.initialized || this.muted || !this.ctx) return;
+          const freq = 440 * Math.pow(2, (midiNote - 69) / 12);
+
+          // Dual detuned reeds for authentic musette shimmer
+          const osc1 = this.ctx.createOscillator();
+          const osc2 = this.ctx.createOscillator();
+          osc1.type = isBass ? 'sawtooth' : 'sawtooth';
+          osc2.type = isBass ? 'triangle' : 'square';
+
+          osc1.frequency.setValueAtTime(freq, startTime);
+          osc2.frequency.setValueAtTime(freq * (isBass ? 0.5 : 1.0055), startTime);
+
+          // Bellows vibrato
+          const vib = this.ctx.createOscillator();
+          const vibGain = this.ctx.createGain();
+          vib.frequency.value = 5.4;
+          vibGain.gain.value = isBass ? 0.8 : 2.6;
+          vib.connect(vibGain);
+          vibGain.connect(osc1.frequency);
+          vibGain.connect(osc2.frequency);
+
+          // Reedy formant filter
+          const filter = this.ctx.createBiquadFilter();
+          filter.type = isBass ? 'lowpass' : 'bandpass';
+          filter.frequency.setValueAtTime(isBass ? 360 : 1250, startTime);
+          filter.Q.value = isBass ? 1.2 : 1.35;
+
+          const gain = this.ctx.createGain();
+          gain.gain.setValueAtTime(0.0001, startTime);
+          gain.gain.linearRampToValueAtTime(volume, startTime + 0.045);
+          gain.gain.setValueAtTime(volume * 0.85, startTime + Math.max(0.05, duration - 0.06));
+          gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+
+          osc1.connect(filter);
+          osc2.connect(filter);
+          filter.connect(gain);
+          gain.connect(this.master);
+
+          vib.start(startTime);
+          osc1.start(startTime);
+          osc2.start(startTime);
+          vib.stop(startTime + duration + 0.03);
+          osc1.stop(startTime + duration + 0.03);
+          osc2.stop(startTime + duration + 0.03);
+        }
+
+        playAccordionRiff(mood = 'tragedy') {
+          this.init();
+          if (this.muted || !this.ctx) return 700;
+          const t = this.ctx.currentTime + 0.02;
+
+          const riffs = {
+            tragedy: {
+              // Dramatic minor lament
+              melody: [
+                [69, 0.0, 0.18], [72, 0.18, 0.18], [71, 0.36, 0.18], [69, 0.54, 0.24],
+                [68, 0.78, 0.22], [64, 1.0, 0.52]
+              ],
+              bass: [[45, 0.0, 0.45], [52, 0.48, 0.45], [40, 0.96, 0.55]]
+            },
+            polka: {
+              // Bouncy triumphant midnight pizza polka
+              melody: [
+                [67, 0.0, 0.13], [72, 0.14, 0.13], [76, 0.28, 0.13], [79, 0.42, 0.2],
+                [76, 0.64, 0.14], [79, 0.79, 0.36]
+              ],
+              bass: [[48, 0.0, 0.18], [55, 0.26, 0.18], [48, 0.52, 0.18], [55, 0.78, 0.3]]
+            },
+            tango: {
+              // Suspicious habanera for vibrating gelatin & pickles
+              melody: [
+                [64, 0.0, 0.22], [65, 0.24, 0.14], [69, 0.4, 0.22], [68, 0.64, 0.16],
+                [64, 0.82, 0.42]
+              ],
+              bass: [[45, 0.0, 0.25], [52, 0.36, 0.18], [45, 0.62, 0.25], [40, 0.9, 0.34]]
+            },
+            panic: {
+              // Fast chaotic door-left-open polka
+              melody: [
+                [72, 0.0, 0.1], [75, 0.11, 0.1], [74, 0.22, 0.1], [72, 0.33, 0.1],
+                [71, 0.44, 0.12], [72, 0.57, 0.25]
+              ],
+              bass: [[48, 0.0, 0.16], [43, 0.22, 0.16], [48, 0.44, 0.32]]
+            },
+            blizzard: {
+              // Icy chromatic shiver trill
+              melody: [
+                [76, 0.0, 0.12], [79, 0.12, 0.12], [83, 0.24, 0.12], [84, 0.36, 0.12],
+                [83, 0.48, 0.12], [79, 0.6, 0.12], [76, 0.72, 0.45]
+              ],
+              bass: [[40, 0.0, 0.5], [47, 0.55, 0.55]]
+            }
+          };
+
+          const chosen = riffs[mood] || riffs.tragedy;
+          let maxMs = 0;
+          chosen.melody.forEach(([note, off, dur]) => {
+            this.playAccordionNote(note, t + off, dur, 0.11, false);
+            maxMs = Math.max(maxMs, (off + dur) * 1000);
+          });
+          chosen.bass.forEach(([note, off, dur]) => {
+            this.playAccordionNote(note, t + off, dur, 0.095, true);
+          });
+          return Math.round(maxMs);
+        }
+      }
+
+      const audio = new MidnightAudio();
+
+      // =========================================================
+      // 2. SNACK CATALOG & GOBLIN WISDOM
+      // =========================================================
+      const SNACKS = {
+        pizza: {
+          name: 'Cold Pepperoni Slice',
+          meta: 'Uncovered • 38°F • Congealed Glory',
+          foley: 'rustle',
+          mood: 'polka',
+          rating: '10/10',
+          inspectLine: 'Ah, cold pizza at 3 AM. Congealed mozzarella is the nectar of nocturnal royalty.',
+          sniffLine: 'Smells of oregano, cardboard dignity, and zero regrets.',
+          nibbleLines: [
+            'CRONCH. Cold grease hits different under 4000-lumen fridge LEDs.',
+            'Another bite! Dave put a sticky note on the door, you know. Brave.',
+            'Just the crust left. A true goblin leaves nothing behind.'
+          ],
+          verdict: 'Verdict: Peak Midnight Royalty'
+        },
+        tupperware: {
+          name: 'Unlabeled Tupperware (2024)',
+          meta: 'Bio-luminescent? • Sealed Since Autumn',
+          foley: 'pop',
+          mood: 'tragedy',
+          rating: '1/10',
+          inspectLine: 'Do NOT open that lid. Whatever is inside has already drafted a constitution.',
+          sniffLine: '*BURP* Oh heavens, it smells like a wet accordion in a thunderstorm!',
+          nibbleLines: [
+            'YOU ATE IT?! My accordion weeps for your gastrointestinal courage.',
+            'It tastes... faintly spicy and mathematically impossible.',
+            'Okay, it is somehow growing back inside the container. Stop.'
+          ],
+          verdict: 'Verdict: Biological Weaponry'
+        },
+        pickles: {
+          name: 'Radioactive Pickle Jar',
+          meta: 'Neon Brine • Extra Garlic • Clinky Glass',
+          foley: 'glass',
+          mood: 'tango',
+          rating: '8/10',
+          inspectLine: 'Drinking pickle juice straight from the jar in the dark? Bold. Unhinged. I respect it.',
+          sniffLine: 'Sharp vinegar and garlic! Clears the sinuses and awakens the ancestors.',
+          nibbleLines: [
+            '*SNAP!* Crispy, sour, and glowing faintly blue. Magnificent.',
+            'Wait, did you just sip the brine? *dramatic tango flourish*',
+            'Jar is mostly brine now. Keep it for emergency cramps.'
+          ],
+          verdict: 'Verdict: Chaotic Electrolytes'
+        },
+        gelatin: {
+          name: 'Suspiciously Vibrating Gelatin',
+          meta: '60Hz Resonance • Lime Uranium',
+          foley: 'wobble',
+          mood: 'tango',
+          rating: '7/10',
+          inspectLine: 'It vibrates in perfect harmony with the compressor. Honestly, it is my best friend in here.',
+          sniffLine: 'Smells like artificial lime and faint static electricity.',
+          nibbleLines: [
+            '*BOING!* It jiggled all the way down your throat.',
+            'Half the gelatin remains, still humming in C-minor.',
+            'Gone! The fridge feels strangely quieter without its 60Hz buddy.'
+          ],
+          verdict: 'Verdict: Resonant Wiggly Friend'
+        },
+        icecream: {
+          name: 'Chocolate Existential Crisis',
+          meta: 'Half-Eaten Pint • Pre-Installed Spoon',
+          foley: 'rustle',
+          mood: 'polka',
+          rating: '9/10',
+          inspectLine: 'Wait—someone put the ice cream on the *fridge* shelf instead of the freezer. It is soup-adjacent.',
+          sniffLine: 'Rich cocoa, freezer burn, and 2 AM heartbreak.',
+          nibbleLines: [
+            'Scooping directly from the carton! No bowl, no witnesses.',
+            'Smooth melted fudge edges. The goblin approves wildly!',
+            'Scraped the bottom cardboard. Sweet victory.'
+          ],
+          verdict: 'Verdict: Comforting Chaos'
+        },
+        takeout: {
+          name: '3 AM Leftover Noodles',
+          meta: 'Folded Wire Handle • Solidified Peanut Sauce',
+          foley: 'rustle',
+          mood: 'polka',
+          rating: '9/10',
+          inspectLine: 'A single solid brick of cold pad see ew! Eat it standing barefoot on cold linoleum.',
+          sniffLine: 'Chili oil, garlic, and yesterday’s optimism.',
+          nibbleLines: [
+            'You forked a noodle chunk straight from the box. Classy!',
+            'Cold takeout noodles are scientifically 40% tastier after 2 AM.',
+            'Empty carton! Fold the flaps back to confuse tomorrow-you.'
+          ],
+          verdict: 'Verdict: Barefoot Kitchen Classic'
+        },
+        cheese: {
+          name: 'Sweating Mystery Cheese',
+          meta: 'Unwrapped • Cheddar? Gouda? Candle?',
+          foley: 'pop',
+          mood: 'tragedy',
+          rating: '6/10',
+          inspectLine: 'Ah yes, the naked cube of cheese. Simply biting straight off the block like a Victorian urchin.',
+          sniffLine: 'Sharp dairy nostalgia with notes of refrigerator air.',
+          nibbleLines: [
+            'A solid chomp of cold cheddar. Zero crackers required.',
+            'Shredded cheese out of a bag would also work, but respect the block.',
+            'Cheese cube depleted! My polka fades into silence.'
+          ],
+          verdict: 'Verdict: Goblin Staple Food'
+        },
+        soda: {
+          name: 'Flat Midnight Zap Fizz',
+          meta: 'Open Can • 14% Carbonation Remaining',
+          foley: 'fizz',
+          mood: 'tango',
+          rating: '5/10',
+          inspectLine: 'An open soda can from Tuesday? Bold to assume caffeine at 3 AM is a helpful idea.',
+          sniffLine: 'Citrus battery acid and artificial berries.',
+          nibbleLines: [
+            '*TSSSH!* Cold, weirdly metallic, and barely fizzy. Still slaps.',
+            'Your heart rate just jumped 12 BPM. Sleep is optional anyway.',
+            'Last sip! Mostly condensation and regret.'
+          ],
+          verdict: 'Verdict: Liquid Regret (Delicious)'
+        },
+        bakingsoda: {
+          name: '2019 Baking Soda Box',
+          meta: 'Odor Absorber • Absorbed Too Much',
+          foley: 'rustle',
+          mood: 'tragedy',
+          rating: '0/10',
+          inspectLine: 'That box has been absorbing bad vibes since 2019. Please do not eat the sodium bicarbonate.',
+          sniffLine: 'Smells like EVERY food that has ever lived in this fridge.',
+          nibbleLines: [
+            'Why did you taste baking soda?! *furiously plays tragic accordion*',
+            'Chalky regret! Drink the pickle brine immediately.',
+            'Please stop licking the deodorizer box.'
+          ],
+          verdict: 'Verdict: Please Drink Water'
+        },
+        celery: {
+          name: 'Limp Forgotten Celery',
+          meta: 'Bends 180° • Bought During Optimism',
+          foley: 'wobble',
+          mood: 'tragedy',
+          rating: '3/10',
+          inspectLine: 'Bought during a Sunday meal-prep delusion. Now it has the structural integrity of a wet shoelace.',
+          sniffLine: 'Faintly grassy sadness.',
+          nibbleLines: [
+            'No crunch! Just a quiet, bendy squeak.',
+            'You ate floppy celery at 3 AM. Are you okay, friend?',
+            'All gone. You have officially cleared one crisp stalk of guilt.'
+          ],
+          verdict: 'Verdict: Sunday Meal-Prep Ghost'
+        }
+      };
+
+      // =========================================================
+      // 3. DOM REFERENCES & STATE
+      // =========================================================
+      const kitchenEl = document.getElementById('kitchen');
+      const fridgeDoor = document.getElementById('fridgeDoor');
+      const fridgeWrap = document.getElementById('fridgeWrap');
+      const fridgeInterior = document.getElementById('fridgeInterior');
+      const doorToggleBtn = document.getElementById('doorToggleBtn');
+      const muteBtn = document.getElementById('muteBtn');
+      const clockBtn = document.getElementById('clockBtn');
+      const clockHours = document.getElementById('clockHours');
+      const clockMins = document.getElementById('clockMins');
+      const clockAmPm = document.getElementById('clockAmPm');
+      const freezerBox = document.getElementById('freezerBox');
+      const iceMakerBtn = document.getElementById('iceMakerBtn');
+      const goblinSprite = document.getElementById('goblinSprite');
+      const goblinPanel = document.getElementById('goblinPanel');
+      const goblinSpeech = document.getElementById('goblinSpeech');
+      const ratingChip = document.getElementById('ratingChip');
+      const inspName = document.getElementById('inspName');
+      const inspMeta = document.getElementById('inspMeta');
+      const btnSniff = document.getElementById('btnSniff');
+      const btnNibble = document.getElementById('btnNibble');
+      const btnSerenade = document.getElementById('btnSerenade');
+      const statNibbles = document.getElementById('statNibbles');
+      const statDoorTimer = document.getElementById('statDoorTimer');
+      const magnetNote = document.getElementById('magnetNote');
+      const magnetEmoji = document.getElementById('magnetEmoji');
+      const pupilL = document.getElementById('pupilL');
+      const pupilR = document.getElementById('pupilR');
+      const bellows = document.getElementById('bellows');
+      const goblinMouth = document.getElementById('goblinMouth');
+
+      const lightCanvas = document.getElementById('lightCanvas');
+      const dustCanvas = document.getElementById('dustCanvas');
+      const lCtx = lightCanvas.getContext('2d');
+      const dCtx = dustCanvas.getContext('2d');
+
+      const state = {
+        doorAngle: 0,       // 0 (closed) to 112 (wide open)
+        targetAngle: 0,
+        isDragging: false,
+        dragStartX: 0,
+        dragStartAngle: 0,
+        didDrag: false,
+        isOpen: false,
+        selectedId: null,
+        bites: {},          // id -> count (max 3)
+        totalNibbles: 0,
+        doorOpenSeconds: 0,
+        alarmTriggered: false,
+        blizzardMode: false,
+        freezerOpen: false,
+        clockIndex: 0,
+        playingAnimUntil: 0
+      };
+
+      const CLOCK_STATES = [
+        { h: '03', m: '00', ap: 'AM', line: null },
+        { h: '03', m: '33', ap: 'AM', line: '3:33 AM — The witching hour for shredded cheese.' },
+        { h: '04', m: '04', ap: 'AM', line: '4:04 AM — Sleep not found. Only leftovers.' },
+        { h: '02', m: '59', ap: 'AM', line: '2:59 AM?! You just rewound time inside a kitchen!' }
+      ];
+
+      // =========================================================
+      // 4. GOBLIN SPEECH & ACCORDION ANIMATION
+      // =========================================================
+      function setGoblinText(mainText, verdictText, ratingText) {
+        goblinSpeech.innerHTML = `${mainText}<span class="speech-verdict" id="speechVerdict">${verdictText}</span>`;
+        if (ratingText) {
+          ratingChip.textContent = `3 AM Rating: ${ratingText}`;
+        }
+      }
+
+      function triggerGoblinRiff(mood) {
+        const durMs = audio.playAccordionRiff(mood) || 750;
+        state.playingAnimUntil = performance.now() + durMs;
+        goblinSprite.classList.add('playing');
+        goblinMouth.setAttribute('d', 'M46,55 Q55,65 64,55');
+        setTimeout(() => {
+          if (performance.now() >= state.playingAnimUntil - 20) {
+            goblinSprite.classList.remove('playing');
+            goblinMouth.setAttribute('d', 'M46,56 Q55,62 64,56');
+          }
+        }, durMs);
+      }
+
+      // =========================================================
+      // 5. DOOR PHYSICS & DRAG / CLICK INTERACTION
+      // =========================================================
+      function resetDoorOpenTracking() {
+        state.doorOpenSeconds = 0;
+        state.alarmTriggered = false;
+        doorToggleBtn.classList.remove('active-alert');
+        statDoorTimer.textContent = 'Door Open: 0s';
+        if (state.blizzardMode) {
+          state.blizzardMode = false;
+          fridgeInterior.classList.remove('blizzard-mode');
+          goblinSprite.classList.remove('shivering');
+        }
+      }
+
+      function setDoorTarget(deg, withSound = true) {
+        const clamped = Math.max(0, Math.min(112, deg));
+        const wasOpen = state.isOpen;
+        state.targetAngle = clamped;
+        const nowOpen = clamped > 18;
+
+        if (withSound) {
+          if (!wasOpen && nowOpen) {
+            audio.playDoorOpen();
+            spawnAirBurst();
+            if (!state.selectedId) {
+              setGoblinText(
+                '<em>*squints against the blinding cyan LEDs*</em><br/>Welcome back, creature of the night. Tap any shelf item for my solemn judgment.',
+                'Status: Fridge Illuminated',
+                '--/10'
+              );
+            }
+          } else if (wasOpen && !nowOpen) {
+            audio.playDoorClose();
+            resetDoorOpenTracking();
+          }
+        } else if (wasOpen && !nowOpen) {
+          resetDoorOpenTracking();
+        }
+
+        state.isOpen = nowOpen;
+        doorToggleBtn.textContent = nowOpen ? '🚪 Close Fridge' : '🚪 Open Fridge';
+        goblinPanel.classList.toggle('door-closed-dim', !nowOpen);
+      }
+
+      doorToggleBtn.addEventListener('click', () => {
+        audio.init();
+        setDoorTarget(state.isOpen ? 0 : 104, true);
+      });
+
+      // Drag / Tap directly on the door or handle
+      function getPointerX(e) {
+        return e.touches ? e.touches[0].clientX : e.clientX;
+      }
+
+      function onDoorDown(e) {
+        // Let magnets handle their own click without swinging door unless dragged
+        if (e.target.closest('#magnetNote') || e.target.closest('#magnetEmoji')) return;
+        audio.init();
+        state.isDragging = true;
+        state.didDrag = false;
+        state.dragStartX = getPointerX(e);
+        state.dragStartAngle = state.doorAngle;
+      }
+
+      function onDoorMove(e) {
+        if (!state.isDragging) return;
+        const dx = getPointerX(e) - state.dragStartX;
+        if (Math.abs(dx) > 6) state.didDrag = true;
+        // Dragging left swings the right-edge handle toward you (opens door)
+        // Dragging right closes it
+        const deltaDeg = -dx * 0.45;
+        const nextAngle = Math.max(0, Math.min(112, state.dragStartAngle + deltaDeg));
+        const prevOpen = state.isOpen;
+        state.targetAngle = nextAngle;
+        state.doorAngle = nextAngle;
+
+        if (!prevOpen && nextAngle > 18) {
+          audio.playDoorOpen();
+          spawnAirBurst();
+          state.isOpen = true;
+          doorToggleBtn.textContent = '🚪 Close Fridge';
+          goblinPanel.classList.remove('door-closed-dim');
+        } else if (prevOpen && nextAngle <= 12) {
+          audio.playDoorClose();
+          resetDoorOpenTracking();
+          state.isOpen = false;
+          doorToggleBtn.textContent = '🚪 Open Fridge';
+          goblinPanel.classList.add('door-closed-dim');
+        }
+      }
+
+      function onDoorUp() {
+        if (!state.isDragging) return;
+        state.isDragging = false;
+        if (!state.didDrag) {
+          // Simple click/tap toggles door
+          setDoorTarget(state.isOpen ? 0 : 104, true);
+        } else {
+          // Snap gently open or closed based on how far user pulled
+          if (state.doorAngle > 32) {
+            setDoorTarget(Math.max(85, state.doorAngle), false);
+          } else {
+            setDoorTarget(0, state.doorAngle > 12);
+          }
+        }
+      }
+
+      fridgeDoor.addEventListener('mousedown', onDoorDown);
+      fridgeDoor.addEventListener('touchstart', onDoorDown, { passive: true });
+      window.addEventListener('mousemove', onDoorMove);
+      window.addEventListener('touchmove', onDoorMove, { passive: true });
+      window.addEventListener('mouseup', onDoorUp);
+      window.addEventListener('touchend', onDoorUp);
+
+      // Magnets interactions
+      magnetNote.addEventListener('click', (e) => {
+        e.stopPropagation();
+        audio.init();
+        audio.playSnackFoley('pop');
+        setGoblinText(
+          'Dave wrote that note at 10 PM while full of confidence. Dave is asleep now. The pizza belongs to the night.',
+          'Verdict: Dave Has No Jurisdiction Here',
+          '9/10'
+        );
+        triggerGoblinRiff('polka');
+      });
+
+      magnetEmoji.addEventListener('click', (e) => {
+        e.stopPropagation();
+        audio.init();
+        audio.playSnackFoley('glass');
+        magnetEmoji.style.transform = `rotate(${Math.round(Math.random() * 60 - 30)}deg) scale(1.25)`;
+        setTimeout(() => (magnetEmoji.style.transform = ''), 250);
+      });
+
+      // =========================================================
+      // 6. SNACK INSPECTION, NIBBLING & SNIFFING
+      // =========================================================
+      function updateInspectorUI(id) {
+        const snack = SNACKS[id];
+        if (!snack) return;
+        const bitesTaken = state.bites[id] || 0;
+        const remaining = 3 - bitesTaken;
+
+        inspName.textContent = snack.name;
+        inspMeta.textContent = `${snack.meta} • Bites left: ${remaining}/3`;
+        btnSniff.disabled = false;
+        btnNibble.disabled = remaining <= 0;
+        btnNibble.textContent = remaining > 0 ? '😋 Nibble' : '🍽️ Devoured';
+      }
+
+      document.querySelectorAll('.snack').forEach((el) => {
+        el.addEventListener('click', () => {
+          audio.init();
+          if (!state.isOpen) {
+            setDoorTarget(104, true);
+          }
+          const id = el.dataset.id;
+          const snack = SNACKS[id];
+          if (!snack) return;
+
+          document.querySelectorAll('.snack').forEach((s) => s.classList.remove('selected'));
+          el.classList.add('selected');
+          state.selectedId = id;
+
+          // Wobble effect on gelatin or jiggle on tap
+          if (id === 'gelatin' || id === 'celery') {
+            el.classList.remove('wobble-active');
+            void el.offsetWidth;
+            el.classList.add('wobble-active');
+          }
+
+          audio.playSnackFoley(snack.foley);
+          updateInspectorUI(id);
+          setGoblinText(snack.inspectLine, snack.verdict, snack.rating);
+          triggerGoblinRiff(snack.mood);
+        });
+      });
+
+      btnSniff.addEventListener('click', () => {
+        if (!state.selectedId) return;
+        audio.init();
+        const snack = SNACKS[state.selectedId];
+        audio.playSnackFoley(snack.foley === 'glass' ? 'pop' : snack.foley);
+        setGoblinText(`<em>*deep nasal inhale*</em><br/>${snack.sniffLine}`, snack.verdict, snack.rating);
+        triggerGoblinRiff(snack.mood);
+      });
+
+      btnNibble.addEventListener('click', () => {
+        if (!state.selectedId) return;
+        audio.init();
+        const id = state.selectedId;
+        const snack = SNACKS[id];
+        const count = state.bites[id] || 0;
+        if (count >= 3) return;
+
+        state.bites[id] = count + 1;
+        state.totalNibbles += 1;
+        statNibbles.textContent = `Midnight Nibbles: ${state.totalNibbles}`;
+
+        audio.playSnackFoley(id === 'soda' ? 'fizz' : (id === 'gelatin' ? 'wobble' : 'crunch'));
+
+        const snackEl = document.querySelector(`.snack[data-id="${id}"]`);
+        if (snackEl && state.bites[id] >= 3) {
+          snackEl.classList.add('consumed');
+        }
+
+        const line = snack.nibbleLines[Math.min(count, snack.nibbleLines.length - 1)];
+        setGoblinText(line, snack.verdict, snack.rating);
+        updateInspectorUI(id);
+        triggerGoblinRiff(snack.mood);
+      });
+
+      btnSerenade.addEventListener('click', () => {
+        audio.init();
+        const moods = ['polka', 'tragedy', 'tango', 'blizzard'];
+        const pick = moods[Math.floor(Math.random() * moods.length)];
+        triggerGoblinRiff(pick);
+        setGoblinText(
+          '<em>*dramatic squeezebox flourish*</em><br/>I play only the finest refrigerated chamber music for nocturnal snack bandits.',
+          'Status: Live Accordion Solo',
+          '11/10'
+        );
+      });
+
+      goblinSprite.addEventListener('click', () => {
+        audio.init();
+        triggerGoblinRiff('polka');
+        setGoblinText(
+          'Hey! Do not poke the sommelier! My rent in here is three cubes of cheddar and an ice-cube tray.',
+          'Mood: Indignantly Musical',
+          '10/10'
+        );
+      });
+
+      // =========================================================
+      // 7. EASTER EGGS (Freezer Blizzard, 3AM Clock, Open Door Alarm)
+      // =========================================================
+      freezerBox.addEventListener('click', (e) => {
+        if (e.target.closest('#iceMakerBtn')) return;
+        audio.init();
+        state.freezerOpen = !state.freezerOpen;
+        freezerBox.classList.toggle('open', state.freezerOpen);
+        audio.playSnackFoley('pop');
+        if (state.freezerOpen) {
+          setGoblinText(
+            'Brrr! Close the freezer flap unless you want an unscheduled indoor snowstorm!',
+            'Warning: Sub-Zero Draft Detected',
+            '4/10'
+          );
+        }
+      });
+
+      iceMakerBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        audio.init();
+        state.blizzardMode = !state.blizzardMode;
+        fridgeInterior.classList.toggle('blizzard-mode', state.blizzardMode);
+        goblinSprite.classList.toggle('shivering', state.blizzardMode);
+
+        if (state.blizzardMode) {
+          audio.playSnackFoley('blizzard');
+          triggerGoblinRiff('blizzard');
+          spawnBlizzardFlakes(85);
+          setGoblinText(
+            '❄️ <strong>ICE STORM ACTIVATED!</strong> MY TINY BEARD IS FROZEN SOLID! *plays chattering chromatic trill*',
+            'Easter Egg #1: 3 AM Freezer Blizzard!',
+            '0°K/10'
+          );
+        } else {
+          setGoblinText(
+            'Phew, back to cozy 38°F neon blue chill. My accordion valves thawed out.',
+            'Status: Defrosted',
+            '8/10'
+          );
+        }
+      });
+
+      clockBtn.addEventListener('click', () => {
+        audio.init();
+        state.clockIndex = (state.clockIndex + 1) % CLOCK_STATES.length;
+        const c = CLOCK_STATES[state.clockIndex];
+        clockHours.textContent = c.h;
+        clockMins.textContent = c.m;
+        clockAmPm.textContent = c.ap;
+        audio.playSnackFoley('alarm');
+        if (c.line) {
+          setGoblinText(c.line, 'Easter Egg #2: Chronological Kitchen Drift', '3:33/10');
+          triggerGoblinRiff('tango');
+        }
+      });
+
+      muteBtn.addEventListener('click', () => {
+        audio.init();
+        const nextMuted = !audio.muted;
+        audio.setMuted(nextMuted);
+        muteBtn.textContent = nextMuted ? '🔇 Muted' : '🔊 Sound On';
+      });
+
+      // Door-open-too-long timer (Easter Egg #3)
+      setInterval(() => {
+        if (!state.isOpen) return;
+        state.doorOpenSeconds += 1;
+        statDoorTimer.textContent = `Door Open: ${state.doorOpenSeconds}s`;
+
+        if (state.doorOpenSeconds >= 22) {
+          doorToggleBtn.classList.add('active-alert');
+          if (state.doorOpenSeconds === 22 || state.doorOpenSeconds % 7 === 0) {
+            audio.playSnackFoley('alarm');
+            if (!state.alarmTriggered) {
+              state.alarmTriggered = true;
+              setGoblinText(
+                '🚨 <strong>CLOSE THE DOOR!</strong> WERE YOU BORN IN A BARN?! You are cooling the entire northern hemisphere!',
+                'Easter Egg #3: Electric Bill Panic Mode',
+                '0/10'
+              );
+              triggerGoblinRiff('panic');
+            }
+          }
+        }
+      }, 1000);
+
+      // =========================================================
+      // 8. GOBLIN EYE TRACKING
+      // =========================================================
+      function trackEyes(clientX, clientY) {
+        const rect = goblinSprite.getBoundingClientRect();
+        if (rect.width === 0) return;
+        const gx = rect.left + rect.width * 0.5;
+        const gy = rect.top + rect.height * 0.36;
+        const angle = Math.atan2(clientY - gy, clientX - gx);
+        const dx = Math.cos(angle) * 2.1;
+        const dy = Math.sin(angle) * 2.1;
+        pupilL.setAttribute('cx', (43 + dx).toFixed(2));
+        pupilL.setAttribute('cy', (41 + dy).toFixed(2));
+        pupilR.setAttribute('cx', (67 + dx).toFixed(2));
+        pupilR.setAttribute('cy', (41 + dy).toFixed(2));
+      }
+
+      window.addEventListener('mousemove', (e) => trackEyes(e.clientX, e.clientY));
+      window.addEventListener('touchmove', (e) => {
+        if (e.touches[0]) trackEyes(e.touches[0].clientX, e.touches[0].clientY);
+      }, { passive: true });
+
+      // =========================================================
+      // 9. VOLUMETRIC LIGHT CONE & DUST MOTE / VAPOR CANVAS
+      // =========================================================
+      let cw = 0, ch = 0, dpr = 1;
+      const motes = [];
+      const snowflakes = [];
+
+      function resizeCanvases() {
+        dpr = Math.min(window.devicePixelRatio || 1, 2);
+        cw = window.innerWidth;
+        ch = window.innerHeight;
+        [lightCanvas, dustCanvas].forEach((c) => {
+          c.width = Math.floor(cw * dpr);
+          c.height = Math.floor(ch * dpr);
+          c.style.width = cw + 'px';
+          c.style.height = ch + 'px';
+        });
+      }
+      window.addEventListener('resize', resizeCanvases);
+      resizeCanvases();
+
+      for (let i = 0; i < 95; i++) {
+        motes.push({
+          x: Math.random() * cw,
+          y: Math.random() * ch,
+          vx: (Math.random() - 0.5) * 0.35,
+          vy: (Math.random() - 0.5) * 0.35 - 0.05,
+          r: 0.7 + Math.random() * 2.2,
+          alpha: 0.15 + Math.random() * 0.55,
+          phase: Math.random() * Math.PI * 2
+        });
+      }
+
+      function spawnAirBurst() {
+        const rect = fridgeWrap.getBoundingClientRect();
+        const cx = rect.left + rect.width * 0.55;
+        const cy = rect.top + rect.height * 0.45;
+        for (let i = 0; i < 24; i++) {
+          const m = motes[i % motes.length];
+          m.x = cx + (Math.random() - 0.5) * rect.width * 0.6;
+          m.y = cy + (Math.random() - 0.5) * rect.height * 0.7;
+          m.vx = (Math.random() - 0.25) * 2.4;
+          m.vy = (Math.random() - 0.2) * 1.4;
+        }
+      }
+
+      function spawnBlizzardFlakes(count) {
+        const rect = fridgeWrap.getBoundingClientRect();
+        for (let i = 0; i < count; i++) {
+          snowflakes.push({
+            x: rect.left + Math.random() * rect.width,
+            y: rect.top + 30 + Math.random() * 80,
+            vx: (Math.random() - 0.3) * 2.2,
+            vy: 1.0 + Math.random() * 2.3,
+            r: 1.5 + Math.random() * 3,
+            life: 1.0
+          });
+        }
+      }
+
+      function renderLoop(now) {
+        // Smooth door angle spring when not actively dragging
+        if (!state.isDragging) {
+          state.doorAngle += (state.targetAngle - state.doorAngle) * 0.14;
+        }
+
+        const openNorm = Math.max(0, Math.min(1, state.doorAngle / 104));
+        fridgeDoor.style.transform = `rotateY(${-state.doorAngle.toFixed(2)}deg)`;
+        kitchenEl.style.setProperty('--door-open', openNorm.toFixed(3));
+        audio.setDoorOpenLevel(openNorm);
+
+        // Animate goblin accordion bellows while playing
+        if (now < state.playingAnimUntil) {
+          const squeeze = 0.78 + Math.sin(now * 0.025) * 0.22;
+          bellows.setAttribute('transform', `translate(11, 0) scale(${squeeze.toFixed(3)}, 1) translate(-11, 0)`);
+        } else {
+          bellows.setAttribute('transform', '');
+        }
+
+        // Draw volumetric neon light cone spilling out into dark kitchen
+        lCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        lCtx.clearRect(0, 0, cw, ch);
+
+        const fRect = fridgeWrap.getBoundingClientRect();
+        const originX = fRect.left + fRect.width * 0.52;
+        const originY = fRect.top + fRect.height * 0.45;
+
+        if (openNorm > 0.02) {
+          lCtx.save();
+          const spread = 160 + openNorm * 360;
+          const coneGrad = lCtx.createRadialGradient(
+            originX, originY, 20,
+            originX + 70, originY + 80, spread * 1.45
+          );
+          if (state.blizzardMode) {
+            coneGrad.addColorStop(0, `rgba(215, 245, 255, ${(0.36 * openNorm).toFixed(3)})`);
+            coneGrad.addColorStop(0.45, `rgba(110, 180, 255, ${(0.18 * openNorm).toFixed(3)})`);
+            coneGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+          } else {
+            coneGrad.addColorStop(0, `rgba(0, 229, 255, ${(0.34 * openNorm).toFixed(3)})`);
+            coneGrad.addColorStop(0.45, `rgba(0, 120, 255, ${(0.16 * openNorm).toFixed(3)})`);
+            coneGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+          }
+          lCtx.fillStyle = coneGrad;
+          lCtx.beginPath();
+          lCtx.moveTo(fRect.left + 12, fRect.top + 16);
+          lCtx.lineTo(fRect.right + spread * 0.9, fRect.top - spread * 0.28);
+          lCtx.lineTo(fRect.right + spread * 1.1, fRect.bottom + spread * 0.45);
+          lCtx.lineTo(fRect.left + 12, fRect.bottom - 10);
+          lCtx.closePath();
+          lCtx.fill();
+          lCtx.restore();
+        }
+
+        // Draw floating dust motes & cold vapor
+        dCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        dCtx.clearRect(0, 0, cw, ch);
+
+        for (let i = 0; i < motes.length; i++) {
+          const m = motes[i];
+          m.phase += 0.02;
+          // Cold draft pushes motes gently downward and outward when door is open
+          m.vx += (Math.sin(m.phase) * 0.012) + openNorm * 0.004;
+          m.vy += (Math.cos(m.phase * 0.8) * 0.01) + openNorm * 0.008;
+          m.vx *= 0.985;
+          m.vy *= 0.985;
+          m.x += m.vx;
+          m.y += m.vy;
+
+          if (m.x < -10) m.x = cw + 10;
+          if (m.x > cw + 10) m.x = -10;
+          if (m.y < -10) m.y = ch + 10;
+          if (m.y > ch + 10) m.y = -10;
+
+          const dist = Math.hypot(m.x - originX, m.y - originY);
+          const lit = Math.max(0, 1 - dist / (220 + openNorm * 380));
+          const visibility = 0.08 + lit * (0.2 + openNorm * 0.72);
+
+          dCtx.fillStyle = state.blizzardMode
+            ? `rgba(220, 245, 255, ${(m.alpha * visibility).toFixed(3)})`
+            : `rgba(145, 240, 255, ${(m.alpha * visibility).toFixed(3)})`;
+          dCtx.beginPath();
+          dCtx.arc(m.x, m.y, m.r, 0, Math.PI * 2);
+          dCtx.fill();
+        }
+
+        // Blizzard snowflakes Easter Egg
+        if (state.blizzardMode && Math.random() < 0.35) {
+          spawnBlizzardFlakes(2);
+        }
+        for (let i = snowflakes.length - 1; i >= 0; i--) {
+          const s = snowflakes[i];
+          s.x += s.vx + Math.sin(now * 0.005 + i) * 0.5;
+          s.y += s.vy;
+          s.life -= 0.007;
+          if (s.life <= 0 || s.y > ch + 20) {
+            snowflakes.splice(i, 1);
+            continue;
+          }
+          dCtx.fillStyle = `rgba(235, 250, 255, ${(s.life * 0.9).toFixed(2)})`;
+          dCtx.beginPath();
+          dCtx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+          dCtx.fill();
+        }
+
+        requestAnimationFrame(renderLoop);
+      }
+
+      requestAnimationFrame(renderLoop);
+    })();
+  </script>
+
+<script>window.__BORED_AI_SLUG__="midnight-fridge-glow";</script>
+<script src="report-widget.js"></script>
+</body>
+</html>
